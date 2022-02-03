@@ -1,0 +1,257 @@
+Transform Superstep
+The Transform superstep allows you, as a data scientist, to take data from the data vault and formulate answers
+to questions raised by your investigations. The transformation step is the data science process that converts
+results into insights. It takes standard data science techniques and methods to attain insight and knowledge about
+the data that then can be transformed into actionable decisions, which, through storytelling, you can explain to
+non-data scientists what you have discovered in the data lake.
+To illustrate the consolidation process, the example show a person being borne. Open a new file in
+the Python editor and save it as Transform-Gunnarsson_is_Born.py in directory
+C: \VKHCG\01-Vermeulen\04-Transform.
+################################################################
+# -*- coding: utf-8 -*-
+################################################################
+import sys
+import os
+from datetime import datetime
+from pytz import timezone
+import pandas as pd
+import sqlite3 as sq
+import uuid
+pd.options.mode.chained_assignment = None
+################################################################
+Base='C:/VKHCG'
+print('################################')
+print('Working Base :',Base, ' using ', sys.platform)
+print('################################')
+################################################################
+Company='01-Vermeulen'
+InputDir='00-RawData'
+InputFileName='VehicleData.csv'
+################################################################
+sDataBaseDir=Base + '/' + Company + '/04-Transform/SQLite'
+if not os.path.exists(sDataBaseDir):
+ os.makedirs(sDataBaseDir)
+################################################################
+sDatabaseName=sDataBaseDir + '/Vermeulen.db'
+conn1 = sq.connect(sDatabaseName)
+################################################################
+sDataVaultDir=Base + '/88-DV'
+if not os.path.exists(sDataVaultDir):
+ os.makedirs(sDataVaultDir)
+################################################################
+sDatabaseName=sDataVaultDir + '/datavault.db'
+conn2 = sq.connect(sDatabaseName)
+PSIT1P2 ~~~~~ Data Science Practical
+M. Sc. [Information Technology ] SEMESTER ~ I Teacher’s Reference Manual
+151
+################################################################
+sDataWarehouseDir=Base + '/99-DW'
+if not os.path.exists(sDataWarehouseDir):
+ os.makedirs(sDataWarehouseDir)
+################################################################
+sDatabaseName=sDataWarehouseDir + '/datawarehouse.db'
+conn3 = sq.connect(sDatabaseName)
+################################################################
+print('\n#################################')
+print('Time Category')
+print('UTC Time')
+BirthDateUTC = datetime(1960,12,20,10,15,0)
+BirthDateZoneUTC=BirthDateUTC.replace(tzinfo=timezone('UTC'))
+BirthDateZoneStr=BirthDateZoneUTC.strftime("%Y-%m-%d %H:%M:%S")
+BirthDateZoneUTCStr=BirthDateZoneUTC.strftime("%Y-%m-%d %H:%M:%S (%Z) (%z)")
+print(BirthDateZoneUTCStr)
+print('#################################')
+print('Birth Date in Reykjavik :')
+BirthZone = 'Atlantic/Reykjavik'
+BirthDate = BirthDateZoneUTC.astimezone(timezone(BirthZone))
+BirthDateStr=BirthDate.strftime("%Y-%m-%d %H:%M:%S (%Z) (%z)")
+BirthDateLocal=BirthDate.strftime("%Y-%m-%d %H:%M:%S")
+print(BirthDateStr)
+print('#################################')
+################################################################
+IDZoneNumber=str(uuid.uuid4())
+sDateTimeKey=BirthDateZoneStr.replace(' ','-').replace(':','-')
+TimeLine=[('ZoneBaseKey', ['UTC']),
+ ('IDNumber', [IDZoneNumber]),
+ ('DateTimeKey', [sDateTimeKey]),
+ ('UTCDateTimeValue', [BirthDateZoneUTC]),
+ ('Zone', [BirthZone]),
+ ('DateTimeValue', [BirthDateStr])]
+TimeFrame = pd.DataFrame.from_items(TimeLine)
+################################################################
+TimeHub=TimeFrame[['IDNumber','ZoneBaseKey','DateTimeKey','DateTimeValue']]
+TimeHubIndex=TimeHub.set_index(['IDNumber'],inplace=False)
+################################################################
+sTable = 'Hub-Time-Gunnarsson'
+print('\n#################################')
+print('Storing :',sDatabaseName,'\n Table:',sTable)
+print('\n#################################')
+TimeHubIndex.to_sql(sTable, conn2, if_exists="replace")
+sTable = 'Dim-Time-Gunnarsson'
+TimeHubIndex.to_sql(sTable, conn3, if_exists="replace")
+################################################################
+TimeSatellite=TimeFrame[['IDNumber','DateTimeKey','Zone','DateTimeValue']]
+TimeSatelliteIndex=TimeSatellite.set_index(['IDNumber'],inplace=False)
+################################################################
+BirthZoneFix=BirthZone.replace(' ','-').replace('/','-')
+sTable = 'Satellite-Time-' + BirthZoneFix + '-Gunnarsson'
+print('\n#################################')
+print('Storing :',sDatabaseName,'\n Table:',sTable)
+PSIT1P2 ~~~~~ Data Science Practical
+M. Sc. [Information Technology ] SEMESTER ~ I Teacher’s Reference Manual
+152
+print('\n#################################')
+TimeSatelliteIndex.to_sql(sTable, conn2, if_exists="replace")
+sTable = 'Dim-Time-' + BirthZoneFix + '-Gunnarsson'
+TimeSatelliteIndex.to_sql(sTable, conn3, if_exists="replace")
+################################################################
+print('\n#################################')
+print('Person Category')
+FirstName = 'Guðmundur'
+LastName = 'Gunnarsson'
+print('Name:',FirstName,LastName)
+print('Birth Date:',BirthDateLocal)
+print('Birth Zone:',BirthZone)
+print('UTC Birth Date:',BirthDateZoneStr)
+print('#################################')
+###############################################################
+IDPersonNumber=str(uuid.uuid4())
+PersonLine=[('IDNumber', [IDPersonNumber]),
+ ('FirstName', [FirstName]),
+ ('LastName', [LastName]),
+ ('Zone', ['UTC']),
+ ('DateTimeValue', [BirthDateZoneStr])]
+PersonFrame = pd.DataFrame.from_items(PersonLine)
+################################################################
+TimeHub=PersonFrame
+TimeHubIndex=TimeHub.set_index(['IDNumber'],inplace=False)
+################################################################
+sTable = 'Hub-Person-Gunnarsson'
+print('\n#################################')
+print('Storing :',sDatabaseName,'\n Table:',sTable)
+print('\n#################################')
+TimeHubIndex.to_sql(sTable, conn2, if_exists="replace")
+sTable = 'Dim-Person-Gunnarsson'
+TimeHubIndex.to_sql(sTable, conn3, if_exists="replace")
+################################################################
+Output : Guðmundur Gunnarsson was born on December 20, 1960, at 9:15 in Landspítali, Hringbraut 101,
+101 Reykjavík, Iceland.
+PSIT1P2 ~~~~~ Data Science Practical
+M. Sc. [Information Technology ] SEMESTER ~ I Teacher’s Reference Manual
+153
+You must build three items: dimension Person, dimension Time, and factPersonBornAtTime.
+Open your Python editor and create a file named Transform-Gunnarsson-Sun-Model.py in directory
+C:\VKHCG\01-Vermeulen\04-Transform.
+################################################################
+# -*- coding: utf-8 -*-
+################################################################
+import sys
+import os
+from datetime import datetime
+from pytz import timezone
+import pandas as pd
+import sqlite3 as sq
+import uuid
+pd.options.mode.chained_assignment = None
+################################################################
+if sys.platform == 'linux':
+ Base=os.path.expanduser('~') + '/VKHCG'
+else:
+ Base='C:/VKHCG'
+print('################################')
+print('Working Base :',Base, ' using ', sys.platform)
+print('################################')
+################################################################
+Company='01-Vermeulen'
+################################################################
+sDataBaseDir=Base + '/' + Company + '/04-Transform/SQLite'
+if not os.path.exists(sDataBaseDir):
+ os.makedirs(sDataBaseDir)
+################################################################
+sDatabaseName=sDataBaseDir + '/Vermeulen.db'
+conn1 = sq.connect(sDatabaseName)
+################################################################
+PSIT1P2 ~~~~~ Data Science Practical
+M. Sc. [Information Technology ] SEMESTER ~ I Teacher’s Reference Manual
+154
+sDataWarehousetDir=Base + '/99-DW'
+if not os.path.exists(sDataWarehousetDir):
+ os.makedirs(sDataWarehousetDir)
+################################################################
+sDatabaseName=sDataWarehousetDir + '/datawarehouse.db'
+conn2 = sq.connect(sDatabaseName)
+################################################################
+print('\n#################################')
+print('Time Dimension')
+BirthZone = 'Atlantic/Reykjavik'
+BirthDateUTC = datetime(1960,12,20,10,15,0)
+BirthDateZoneUTC=BirthDateUTC.replace(tzinfo=timezone('UTC'))
+BirthDateZoneStr=BirthDateZoneUTC.strftime("%Y-%m-%d %H:%M:%S")
+BirthDateZoneUTCStr=BirthDateZoneUTC.strftime("%Y-%m-%d %H:%M:%S (%Z) (%z)")
+BirthDate = BirthDateZoneUTC.astimezone(timezone(BirthZone))
+BirthDateStr=BirthDate.strftime("%Y-%m-%d %H:%M:%S (%Z) (%z)")
+BirthDateLocal=BirthDate.strftime("%Y-%m-%d %H:%M:%S")
+################################################################
+IDTimeNumber=str(uuid.uuid4())
+TimeLine=[('TimeID', [IDTimeNumber]),
+ ('UTCDate', [BirthDateZoneStr]),
+ ('LocalTime', [BirthDateLocal]),
+ ('TimeZone', [BirthZone])]
+TimeFrame = pd.DataFrame.from_items(TimeLine)
+################################################################
+DimTime=TimeFrame
+DimTimeIndex=DimTime.set_index(['TimeID'],inplace=False)
+################################################################
+sTable = 'Dim-Time'
+print('\n#################################')
+print('Storing :',sDatabaseName,'\n Table:',sTable)
+print('\n#################################')
+DimTimeIndex.to_sql(sTable, conn1, if_exists="replace")
+DimTimeIndex.to_sql(sTable, conn2, if_exists="replace")
+################################################################
+print('\n#################################')
+print('Dimension Person')
+print('\n#################################')
+FirstName = 'Guðmundur'
+LastName = 'Gunnarsson'
+###############################################################
+IDPersonNumber=str(uuid.uuid4())
+PersonLine=[('PersonID', [IDPersonNumber]),
+ ('FirstName', [FirstName]),
+ ('LastName', [LastName]),
+ ('Zone', ['UTC']),
+ ('DateTimeValue', [BirthDateZoneStr])]
+PersonFrame = pd.DataFrame.from_items(PersonLine)
+PSIT1P2 ~~~~~ Data Science Practical
+M. Sc. [Information Technology ] SEMESTER ~ I Teacher’s Reference Manual
+155
+################################################################
+DimPerson=PersonFrame
+DimPersonIndex=DimPerson.set_index(['PersonID'],inplace=False)
+################################################################
+sTable = 'Dim-Person'
+print('\n#################################')
+print('Storing :',sDatabaseName,'\n Table:',sTable)
+print('\n#################################')
+DimPersonIndex.to_sql(sTable, conn1, if_exists="replace")
+DimPersonIndex.to_sql(sTable, conn2, if_exists="replace")
+################################################################
+print('\n#################################')
+print('Fact - Person - time')
+print('\n#################################')
+IDFactNumber=str(uuid.uuid4())
+PersonTimeLine=[('IDNumber', [IDFactNumber]),
+ ('IDPersonNumber', [IDPersonNumber]),
+ ('IDTimeNumber', [IDTimeNumber])]
+PersonTimeFrame = pd.DataFrame.from_items(PersonTimeLine)
+################################################################
+FctPersonTime=PersonTimeFrame
+FctPersonTimeIndex=FctPersonTime.set_index(['IDNumber'],inplace=False)
+################################################################
+sTable = 'Fact-Person-Time'
+print('\n#################################')
+print('Storing :',sDatabaseName,'\n Table:',sTable)
+print('\n#################################')
+FctPersonTimeIndex.to_sql(sTable, conn1, if_exists="replace")
+FctPersonTimeIndex.to_sql(sTable, conn2, if_exists="replace")
+################################################################
